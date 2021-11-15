@@ -16,8 +16,8 @@ use model::Env;
 use std::{rc::Rc, cell::RefCell, io};
 use std::io::Write;
 
-/// Starts a REPL prompt at stdin/stdout. **This will block the current thread.**
-pub fn start_repl(env: Option<Env>) {
+//// Starts a REPL prompt at stdin/stdout. **This will block the current thread.**
+/*pub fn start_repl(env: Option<Env>) {
   let env_rc = Rc::new(RefCell::new(env.unwrap_or(default_env())));
 
   loop {
@@ -37,4 +37,4 @@ pub fn start_repl(env: Option<Env>) {
       Err(e) => println!("{}", e),
     };
   }
-}
+}*/

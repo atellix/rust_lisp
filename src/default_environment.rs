@@ -1,12 +1,12 @@
-
-use std::collections::HashMap;
+use std::collections::BTreeMap;
+use solana_program::account_info::AccountInfo;
 use crate::{utils::{require_list_parameter, require_parameter, require_int_parameter}, model::{Value, Env, RuntimeError, List}, interpreter::eval, lisp};
 
 /// Initialize an instance of `Env` with several core Lisp functions implemented
 /// in Rust. **Without this, you will only have access to the functions you 
 /// implement yourself.**
 pub fn default_env() -> Env {
-  let mut entries = HashMap::new();
+  let mut entries = BTreeMap::new();
 
   entries.insert(
     String::from("print"),
@@ -14,7 +14,7 @@ pub fn default_env() -> Env {
       |_env, args| {
         let expr = require_parameter("print", args, 0)?;
 
-        println!("{}", &expr);
+        //println!("{}", &expr);
         return Ok(expr.clone());
       }));
 

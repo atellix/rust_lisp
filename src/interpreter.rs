@@ -1,6 +1,6 @@
 
 use crate::{model::{Value, Env, RuntimeError, Lambda, List}};
-use std::{collections::HashMap, rc::Rc, cell::{RefCell}};
+use std::{collections::BTreeMap, rc::Rc, cell::{RefCell}};
 
 /// Evaluate a single Lisp expression in the context of a given environment.
 pub fn eval(env: Rc<RefCell<Env>>, expression: &Value) -> Result<Value,RuntimeError> {
@@ -130,7 +130,7 @@ fn eval_inner(env: Rc<RefCell<Env>>, expression: &Value, found_tail: bool, in_fu
         Value::Symbol(symbol) if symbol == "let" => {
           let let_env = Rc::new(RefCell::new(Env {
             parent: Some(env.clone()),
-            entries: HashMap::new()
+            entries: BTreeMap::new()
           }));
           let declarations = list.cdr().car()?;
 
@@ -273,7 +273,7 @@ fn call_function(env: Rc<RefCell<Env>>, func: &Value, args: Vec<Result<Value,Run
       let argnames = lamb.argnames.as_list().unwrap();
 
       // bind args
-      let mut entries: HashMap<String,Value> = HashMap::new();
+      let mut entries: BTreeMap<String,Value> = BTreeMap::new();
       
       for (index, arg_name) in argnames.into_iter().enumerate() {
         let name = arg_name.as_symbol().unwrap();

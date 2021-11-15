@@ -17,3 +17,6 @@ doc = true
 [[bin]]
 name = "rust_lisp"
 path = "src/main.rs"
+
+[dependencies]
+solana-program = "1.7.11"

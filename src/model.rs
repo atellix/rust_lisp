@@ -1,5 +1,5 @@
 use std::rc::Rc;
-use std::{fmt::{Debug, Display}, collections::HashMap};
+use std::{fmt::{Debug, Display}, collections::BTreeMap};
 use std::{cmp::Ordering, cell::RefCell};
 
 pub use list::List;
@@ -381,7 +381,7 @@ impl Display for RuntimeError {
 #[derive(Debug)]
 pub struct Env {
   pub parent: Option<Rc<RefCell<Env>>>,
-  pub entries: HashMap<String,Value>,
+  pub entries: BTreeMap<String,Value>,
 }
 
 impl Env {
