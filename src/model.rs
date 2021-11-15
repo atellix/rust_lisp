@@ -4,6 +4,7 @@ use std::{cmp::Ordering, cell::RefCell};
 
 pub use list::List;
 
+use solana_program::account_info::AccountInfo;
 
 /// `Value` encompasses all possible Lisp values, including atoms, lists, and 
 /// others.
@@ -363,7 +364,7 @@ impl PartialEq for Lambda {
 }
 
 /// The trait bound for any Rust function that is to be called from lisp code
-type NativeFunc = fn(env: Rc<RefCell<Env>>, args: &Vec<Value>) -> Result<Value, RuntimeError>;
+type NativeFunc = fn(env: Rc<RefCell<Env>>, args: &Vec<Value>, ctx: &Vec<AccountInfo>) -> Result<Value, RuntimeError>;
 
 #[derive(Debug, Clone)]
 pub struct RuntimeError {

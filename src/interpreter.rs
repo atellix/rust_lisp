@@ -2,23 +2,25 @@
 use crate::{model::{Value, Env, RuntimeError, Lambda, List}};
 use std::{collections::BTreeMap, rc::Rc, cell::{RefCell}};
 
+use solana_program::account_info::AccountInfo;
+
 /// Evaluate a single Lisp expression in the context of a given environment.
-pub fn eval(env: Rc<RefCell<Env>>, expression: &Value) -> Result<Value,RuntimeError> {
-  eval_inner(env, expression, false, false)
+pub fn eval(env: Rc<RefCell<Env>>, expression: &Value, ctx: &Vec<AccountInfo>) -> Result<Value,RuntimeError> {
+  eval_inner(env, ctx, expression, false, false)
 }
 
 /// Evaluate a series of s-expressions. Each expression is evaluated in 
 /// order and the final one's return value is returned.
-pub fn eval_block(env: Rc<RefCell<Env>>, clauses: impl Iterator<Item=Value>) -> Result<Value,RuntimeError> {
-  eval_block_inner(env, clauses, false, false)
+pub fn eval_block(env: Rc<RefCell<Env>>, ctx: &Vec<AccountInfo>, clauses: impl Iterator<Item=Value>) -> Result<Value,RuntimeError> {
+  eval_block_inner(env, ctx, clauses, false, false)
 }
 
-fn eval_block_inner(env: Rc<RefCell<Env>>, clauses: impl Iterator<Item=Value>, found_tail: bool, in_func: bool) -> Result<Value,RuntimeError> {
+fn eval_block_inner(env: Rc<RefCell<Env>>, ctx: &Vec<AccountInfo>, clauses: impl Iterator<Item=Value>, found_tail: bool, in_func: bool) -> Result<Value,RuntimeError> {
 
   let mut current_expr: Option<Value> = None;
   for clause in clauses {
     if let Some(expr) = current_expr {
-      match eval_inner(env.clone(), &expr, true, in_func) {
+      match eval_inner(env.clone(), ctx, &expr, true, in_func) {
         Ok(_) => (),
         Err(e) => {
           return Err(e);
@@ -29,7 +31,7 @@ fn eval_block_inner(env: Rc<RefCell<Env>>, clauses: impl Iterator<Item=Value>, f
     current_expr = Some(clause);
   }
 
-  return eval_inner(env.clone(), &current_expr.unwrap(), found_tail, in_func);
+  return eval_inner(env.clone(), ctx, &current_expr.unwrap(), found_tail, in_func);
 }
 
 /// `found_tail` and `in_func` are used when locating the tail position for 
@@ -39,7 +41,7 @@ fn eval_block_inner(env: Rc<RefCell<Env>>, clauses: impl Iterator<Item=Value>, f
 /// factor out function calls in, say, the conditional slot, which are not 
 /// eligible to be the tail-call based on their position. A future refactor hopes
 /// to make things a little more semantic.
-fn eval_inner(env: Rc<RefCell<Env>>, expression: &Value, found_tail: bool, in_func: bool) -> Result<Value,RuntimeError> {
+fn eval_inner(env: Rc<RefCell<Env>>, ctx: &Vec<AccountInfo>, expression: &Value, found_tail: bool, in_func: bool) -> Result<Value,RuntimeError> {
 
   let result: Result<Value,RuntimeError> = match expression {
 
@@ -58,7 +60,7 @@ fn eval_inner(env: Rc<RefCell<Env>>, expression: &Value, found_tail: bool, in_fu
           let cdr = list.cdr();
           let symbol = cdr.car()?.as_symbol().unwrap();
           let value_expr = &cdr.cdr().car()?;
-          let value = eval_inner(env.clone(), value_expr, true, in_func)?;
+          let value = eval_inner(env.clone(), ctx, value_expr, true, in_func)?;
 
           env.borrow_mut().entries.insert(symbol, value.clone());
 
@@ -69,7 +71,7 @@ fn eval_inner(env: Rc<RefCell<Env>>, expression: &Value, found_tail: bool, in_fu
           let cdr = list.cdr();
           let symbol = cdr.car()?.as_symbol().unwrap();
           let value_expr = &cdr.cdr().car()?;
-          let value = eval_inner(env.clone(), value_expr, true, in_func)?;
+          let value = eval_inner(env.clone(), ctx, value_expr, true, in_func)?;
 
           if env.borrow().entries.contains_key(&symbol) {
             env.borrow_mut().entries.insert(symbol, value.clone());
@@ -139,19 +141,19 @@ fn eval_inner(env: Rc<RefCell<Env>>, expression: &Value, found_tail: bool, in_fu
             let symbol = decl_cons.car()?.as_symbol().unwrap();
             let expr = &decl_cons.cdr().car()?;
 
-            let result = eval_inner(let_env.clone(), &expr, true, in_func)?;
+            let result = eval_inner(let_env.clone(), ctx, &expr, true, in_func)?;
             let_env.borrow_mut().entries.insert(symbol, result);
           }
 
           let body = Value::List(list.cdr().cdr());
 
-          eval_block_inner(let_env.clone(), body.as_list().unwrap().into_iter(), found_tail, in_func)
+          eval_block_inner(let_env.clone(), ctx, body.as_list().unwrap().into_iter(), found_tail, in_func)
         },
 
         Value::Symbol(symbol) if symbol == "begin" => {
           let body = Value::List(list.cdr());
 
-          eval_block_inner(env.clone(), body.as_list().unwrap().into_iter(), found_tail, in_func)
+          eval_block_inner(env.clone(), ctx, body.as_list().unwrap().into_iter(), found_tail, in_func)
         },
 
         Value::Symbol(symbol) if symbol == "cond" => {
@@ -162,8 +164,8 @@ fn eval_inner(env: Rc<RefCell<Env>>, expression: &Value, found_tail: bool, in_fu
             let condition = &clause.car()?;
             let then = &clause.cdr().car()?;
 
-            if eval_inner(env.clone(), condition, true, in_func)?.is_truthy() {
-              result = eval_inner(env.clone(), then, found_tail, in_func)?;
+            if eval_inner(env.clone(), ctx, condition, true, in_func)?.is_truthy() {
+              result = eval_inner(env.clone(), ctx, then, found_tail, in_func)?;
               break;
             }
           }
@@ -177,11 +179,11 @@ fn eval_inner(env: Rc<RefCell<Env>>, expression: &Value, found_tail: bool, in_fu
           let then_result = &cdr.cdr().car()?;
           let else_result = cdr.cdr().cdr().car().ok();
 
-          if eval_inner(env.clone(), condition, true, in_func)?.is_truthy() {
-            Ok(eval_inner(env.clone(), then_result, found_tail, in_func)?)
+          if eval_inner(env.clone(), ctx, condition, true, in_func)?.is_truthy() {
+            Ok(eval_inner(env.clone(), ctx, then_result, found_tail, in_func)?)
           } else {
             Ok(match else_result {
-              Some(v) => eval_inner(env.clone(), &v, found_tail, in_func)?,
+              Some(v) => eval_inner(env.clone(), ctx, &v, found_tail, in_func)?,
               None => Value::NIL
             })
           }
@@ -193,8 +195,8 @@ fn eval_inner(env: Rc<RefCell<Env>>, expression: &Value, found_tail: bool, in_fu
           let b = &cdr.cdr().car()?;
 
           Ok(Value::from_truth(
-              eval_inner(env.clone(), a, true, in_func)?.is_truthy() 
-              && eval_inner(env.clone(), b, true, in_func)?.is_truthy()
+              eval_inner(env.clone(), ctx, a, true, in_func)?.is_truthy() 
+              && eval_inner(env.clone(), ctx, b, true, in_func)?.is_truthy()
           ))
         },
 
@@ -204,17 +206,17 @@ fn eval_inner(env: Rc<RefCell<Env>>, expression: &Value, found_tail: bool, in_fu
           let b = &cdr.cdr().car()?;
 
           Ok(Value::from_truth(
-              eval_inner(env.clone(), a, true, in_func)?.is_truthy() 
-              || eval_inner(env.clone(), b, true, in_func)?.is_truthy()
+              eval_inner(env.clone(), ctx, a, true, in_func)?.is_truthy() 
+              || eval_inner(env.clone(), ctx, b, true, in_func)?.is_truthy()
           ))
         },
 
 
         // function call
         _ => {
-          let func = eval_inner(env.clone(), &list.car()?, true, in_func)?;
+          let func = eval_inner(env.clone(), ctx, &list.car()?, true, in_func)?;
           let args = list.into_iter().skip(1)
-            .map(|car| eval_inner(env.clone(), &car, true, in_func).map_err(|e| e.clone()));
+            .map(|car| eval_inner(env.clone(), ctx, &car, true, in_func).map_err(|e| e.clone()));
 
           if !found_tail && in_func {
             let args_vec = args
@@ -229,9 +231,9 @@ fn eval_inner(env: Rc<RefCell<Env>>, expression: &Value, found_tail: bool, in_fu
             return Ok(expr);
           } else {
 
-            let mut res = call_function(env.clone(), &func, args.collect());
+            let mut res = call_function(env.clone(), &func, args.collect(), ctx);
             while let Ok(Value::TailCall { func, args }) = res {
-              res = call_function(env.clone(), &func, args.iter().map(|arg| Ok(arg.clone())).collect());
+              res = call_function(env.clone(), &func, args.iter().map(|arg| Ok(arg.clone())).collect(), ctx);
             }
 
             res
@@ -250,7 +252,7 @@ fn eval_inner(env: Rc<RefCell<Env>>, expression: &Value, found_tail: bool, in_fu
 /// Calling a function is separated from the main `eval_inner()` function
 /// so that tail calls can be evaluated without just returning themselves 
 /// as-is as a tail-call.
-fn call_function(env: Rc<RefCell<Env>>, func: &Value, args: Vec<Result<Value,RuntimeError>>) -> Result<Value, RuntimeError> {
+fn call_function(env: Rc<RefCell<Env>>, func: &Value, args: Vec<Result<Value,RuntimeError>>, ctx: &Vec<AccountInfo>) -> Result<Value, RuntimeError> {
   match func {
 
     // call native function
@@ -264,7 +266,7 @@ fn call_function(env: Rc<RefCell<Env>>, func: &Value, args: Vec<Result<Value,Run
 
       match err {
         Some(e) => Err(e),
-        None => func(env.clone(), &args_vec)
+        None => func(env.clone(), &args_vec, ctx)
       }
     },
 
@@ -292,7 +294,7 @@ fn call_function(env: Rc<RefCell<Env>>, func: &Value, args: Vec<Result<Value,Run
       }));
           
       // evaluate each line of body
-      eval_block_inner(arg_env.clone(), lamb.body.as_list().unwrap().into_iter(), false, true)
+      eval_block_inner(arg_env.clone(), ctx, lamb.body.as_list().unwrap().into_iter(), false, true)
     }
     _ => Err(RuntimeError { msg: String::from("Argument 0 is not callable") })
   }
