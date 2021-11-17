@@ -202,7 +202,7 @@ pub fn default_env() -> Env {
       |_env, args, _ctx| {
         let list = require_list_parameter("length", args, 0)?;
 
-        return Ok(Value::Int(list.into_iter().len() as i32));
+        return Ok(Value::Int(list.into_iter().len() as i128));
       }));
 
   entries.insert(

@@ -271,7 +271,7 @@ fn read_atom(token: &str) -> Value {
     return Value::NIL;
   }
 
-  let as_int = token.parse::<i32>();
+  let as_int = token.parse::<i128>();
   if as_int.is_ok() {
     return Value::Int(as_int.unwrap());
   }

@@ -12,7 +12,7 @@ use solana_program::account_info::AccountInfo;
 pub enum Value {
   True,
   False,
-  Int(i32),
+  Int(i128),
   Float(f32),
   String(String),
   Symbol(String),
@@ -60,7 +60,7 @@ impl Value {
     }
   }
 
-  pub fn as_int(&self) -> Option<i32> {
+  pub fn as_int(&self) -> Option<i128> {
     match self {
       Value::Int(n) => Some(*n),
       _ => None
@@ -181,7 +181,7 @@ impl PartialOrd for Value {
       Value::Symbol(n) => if let Value::Symbol(s) = other { n.partial_cmp(s) } else { None },
       Value::Int(n) => match other {
         Value::Int(o) => n.partial_cmp(o),
-        Value::Float(o) => n.partial_cmp(&(o.round() as i32)),
+        Value::Float(o) => n.partial_cmp(&(o.round() as i128)),
         _ => None
       },
       Value::Float(n) => match other {
@@ -411,7 +411,7 @@ impl Display for Env {
   }
 }
 
-fn display_one_env_level(env: &Env, output: &mut String, depth: i32) {
+fn display_one_env_level(env: &Env, output: &mut String, depth: i128) {
   let indent = &(0..depth).map(|_| "  ").collect::<String>();
 
   output.push_str(indent);

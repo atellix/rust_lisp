@@ -18,9 +18,9 @@ pub fn require_parameter<'a>(func_name: &str, args: &'a Vec<Value>, index: usize
 }
 
 /// Given a `Value` assumed to be a `Value::List()`, grab the item at `index`, 
-/// assumed to be a `Value::Int()`, and return its inner i32. Err if any part 
+/// assumed to be a `Value::Int()`, and return its inner i128. Err if any part 
 /// of this fails.
-pub fn require_int_parameter(func_name: &str, args: &Vec<Value>, index: usize) -> Result<i32,RuntimeError> {
+pub fn require_int_parameter(func_name: &str, args: &Vec<Value>, index: usize) -> Result<i128,RuntimeError> {
   match require_parameter(func_name, args, index) {
     Ok(val) => match val.as_int() {
       Some(x) => Ok(x),
